@@ -1,0 +1,115 @@
+loader.entrypoint = "file:{{ gramine.libos }}"
+libos.entrypoint = "{{ entrypoint }}"
+
+# Gramine log level
+loader.log_level = "{{ log_level }}"
+
+# Read application arguments directly from the command line. Don't use this on production!
+loader.insecure__use_cmdline_argv = true
+loader.insecure__use_host_env = true
+sys.insecure__allow_eventfd = true
+sys.enable_sigterm_injection = true
+
+### Environment variables for Python
+# Enable In-SGX mode for SecCask Workers
+loader.env.LD_LIBRARY_PATH = "/lib:{{ python.get_paths().data }}/lib:{{ arch_libdir }}:/usr/lib:/usr{{ arch_libdir }}"
+loader.env.PATH = "{{ python.get_paths().data }}/bin:/usr/bin:/usr/local/bin/:/bin:{{ arch_libdir }}:{{ execdir }}"
+loader.env.HOME = "{{ home }}"
+loader.env.PYTHONPATH = "/home/mlcask/sgx/encfspython/exp/mlperf-tr-objdtc:{{ python.get_paths().data }}/lib/python3.9/site-packages"
+loader.env.PYTHONHOME = "/home/mlcask/sgx/lib/cpython-3.9.13-install"
+loader.env.CUDA_VISIBLE_DEVICES = "-1"
+loader.env.OMP_NUM_THREADS = "8"
+loader.env.TF_NUM_INTRAOP_THREADS = "8"
+loader.env.TF_NUM_INTEROP_THREADS = "8"
+loader.env.PYTHONDONTWRITEBYTECODE = "1"
+loader.env.HDF5_USE_FILE_LOCKING = "FALSE"
+
+
+### Mounted FSes. The following "chroot" FSes mount a part of the host FS into the
+### guest. Other parts of the host FS will not be available in the guest.
+fs.mounts = [
+    # Default glibc files, mounted from the Runtime directory in GramineDIR.
+    { type = "chroot", uri = "file:{{ gramine.runtimedir() }}", path = "/lib" },
+    # Host-level libraries (e.g., /lib/x86_64-linux-gnu) required by the Python executable
+    { type = "chroot", uri = "file:{{ arch_libdir }}", path = "{{ arch_libdir }}" },
+    # Host-level directory (/usr) required by the Python executable
+    { type = "chroot", uri = "file:/usr", path = "/usr" },
+    # Mount $PYTHONHOME
+    { type = "chroot", uri = "file:{{ python.get_paths().data }}", path = "{{ python.get_paths().data }}" },
+    # Mount $PYTHONDISTHOME
+    { type = "chroot", uri = "file:{{ python.stdlib }}", path = "{{ python.stdlib }}" },
+    # Mount /tmp
+    { type = "chroot", uri = "file:/tmp", path = "/tmp" },
+    # Mount /etc
+    { type = "chroot", uri = "file:/etc", path = "/etc" },
+
+    ### SecCask Specified
+    # Mount $APP_HOME
+    { type = "chroot", uri = "file:/home/mlcask/sgx", path = "/home/mlcask/sgx" },
+    # Mount temp-path
+    { type = "chroot", uri = "file:{{ home }}/seccask-temp", path = "{{ home }}/seccask-temp" },
+    # Mount /bin
+    { type = "chroot", uri = "file:{{ execdir }}", path = "{{ execdir }}" },
+    # Mount dataset dirs
+    { type = "chroot", uri = "file:/data0/mlcask", path = "/data0/mlcask" },
+    # Mount temp-path
+    { type = "chroot", uri = "file:/mnt/ramdisk/raw", path = "/mnt/ramdisk/raw" },
+    { type = "chroot", uri = "file:/mnt/ramdisk/encfs", path = "/mnt/ramdisk/encfs" },
+    # Mount MonkeyTest directory
+    { type = "encrypted", uri = "file:/mnt/ramdisk/protectedfs", path = "/mnt/ramdisk/protectedfs", key_name = "MAIN_KEY" },
+]
+
+fs.insecure__keys.MAIN_KEY = "12345678901234567890123456789012"
+
+### Gramine general settings ###
+
+# Normal
+# loader.pal_internal_mem_size = "128M"
+# sgx.enclave_size = "2G"
+# sgx.thread_num = 32
+# sgx.nonpie_binary = true
+# sgx.static_address = true
+
+# sgx.remote_attestation = "dcap"
+
+loader.pal_internal_mem_size = "128M"
+sys.stack.size = "1M"
+sgx.enclave_size = "16G"
+sgx.thread_num = 128
+sgx.nonpie_binary = true
+# sgx.static_address = true
+
+sgx.file_check_policy = "allow_all_but_log"
+
+# sgx.require_avx = true
+# sgx.require_avx512 = true
+
+
+### SecCask specific settings ###
+
+# Profiling
+# sgx.debug = true
+# sgx.profile.enable = "all"
+# sgx.profile.mode = "ocall_inner"
+# sgx.profile.with_stack = true
+
+
+sgx.trusted_files = [
+    "file:{{ entrypoint }}",
+    "file:{{ gramine.runtimedir() }}/",
+    "file:{{ arch_libdir }}/",
+    "file:{{ python.stdlib }}/",
+    "file:{{ python.get_paths().data }}/lib/python3.9/site-packages/",
+]
+
+sgx.allowed_files = [
+    "file:/tmp/",
+    "file:/etc/",
+    "file:/usr/",
+
+    # SecCask Specified
+    "file:/mnt/ramdisk/raw",
+    "file:/mnt/ramdisk/encfs",
+    "file:{{ home }}/seccask-temp/",
+    "file:/data0/mlcask/",
+]
